@@ -13,6 +13,8 @@ use winapi::{
     },
     STRUCT
 };
+use crate::Addr;
+
 pub const BLUETOOTH_MAX_NAME_SIZE: usize = 248;
 pub type PFN_DEVICE_CALLBACK = Option<unsafe extern "system" fn(
     pvParam: LPVOID,
@@ -20,11 +22,11 @@ pub type PFN_DEVICE_CALLBACK = Option<unsafe extern "system" fn(
 )>;
 pub type PBLUETOOTH_DEVICE_INFO = *mut BLUETOOTH_DEVICE_INFO;
 pub type PBLUETOOTH_RADIO_INFO = *mut BLUETOOTH_RADIO_INFO;
-pub type BTH_ADDR = ULONGLONG;
-pub type HBLUETOOTH_DEVICE_FIND = LPVOID;
+// pub type BTH_ADDR = ULONGLONG;
+// pub type HBLUETOOTH_DEVICE_FIND = LPVOID;
 pub type HBLUETOOTH_RADIO_FIND = LPVOID;
 STRUCT!{struct BLUETOOTH_ADDRESS{
-    inner: DWORD,
+    inner: ULONGLONG,
 }}
 STRUCT!{struct BLUETOOTH_DEVICE_INFO{ 
     dwSize: DWORD,
@@ -81,23 +83,23 @@ STRUCT!{struct BLUETOOTH_FIND_RADIO_PARAMS {
 }}
 
 extern "system" {
-    pub fn BluetoothSelectDevices (
-        pbtsdp: *mut BLUETOOTH_SELECT_DEVICE_PARAMS
-    ) -> BOOL;
-    pub fn BluetoothSelectDevicesFree (
-        pbtsdp: *mut BLUETOOTH_SELECT_DEVICE_PARAMS
-    ) -> BOOL;
-    pub fn BluetoothFindFirstDevice (
-        pbtsp: *const BLUETOOTH_DEVICE_SEARCH_PARAMS,
-        pbtdi: *mut BLUETOOTH_DEVICE_INFO,
-    ) -> HBLUETOOTH_DEVICE_FIND;
-    pub fn BluetoothFindNextDevice (
-        hFind: HBLUETOOTH_DEVICE_FIND,
-        pbtdi: *mut BLUETOOTH_DEVICE_INFO,
-    ) -> BOOL;
-    pub fn BluetoothFindDeviceClose (
-        hFind: HBLUETOOTH_DEVICE_FIND
-    ) -> BOOL;
+    // pub fn BluetoothSelectDevices (
+    //     pbtsdp: *mut BLUETOOTH_SELECT_DEVICE_PARAMS
+    // ) -> BOOL;
+    // pub fn BluetoothSelectDevicesFree (
+    //     pbtsdp: *mut BLUETOOTH_SELECT_DEVICE_PARAMS
+    // ) -> BOOL;
+    // pub fn BluetoothFindFirstDevice (
+    //     pbtsp: *const BLUETOOTH_DEVICE_SEARCH_PARAMS,
+    //     pbtdi: *mut BLUETOOTH_DEVICE_INFO,
+    // ) -> HBLUETOOTH_DEVICE_FIND;
+    // pub fn BluetoothFindNextDevice (
+    //     hFind: HBLUETOOTH_DEVICE_FIND,
+    //     pbtdi: *mut BLUETOOTH_DEVICE_INFO,
+    // ) -> BOOL;
+    // pub fn BluetoothFindDeviceClose (
+    //     hFind: HBLUETOOTH_DEVICE_FIND
+    // ) -> BOOL;
     pub fn BluetoothFindFirstRadio (
         pbtfrp: *const BLUETOOTH_FIND_RADIO_PARAMS,
         phRadio: *mut HANDLE,
@@ -115,21 +117,79 @@ extern "system" {
     ) -> BOOL;
 }
 
+macro_rules! create_struct {
+    ($struct_name: ident, $ptr_name: ident, $struct_type: ty) => {
+        let mut $struct_name: $struct_type = core::mem::zeroed();
+        $struct_name.dwSize = core::mem::size_of::<$struct_type>() as DWORD;
+        let $ptr_name = &$struct_name as *const _ as *mut $struct_type;
+    };
+}
+
 #[derive(Debug)]
 pub struct Radio {
-    handle: HANDLE,
+    hRadio: HANDLE,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct RadioInfo {
+    addr: Addr,
+    name: String,
+    class: u32,
+    subversion: u16,
+    manufacturer: u16,
+}
+
+fn ull_to_addr(src: ULONGLONG) -> Addr {
+    Addr::from(unsafe { *(&src as *const u64 as *const [u8; 6]) })
+}
+
+impl RadioInfo {
+    unsafe fn from_radio_handle(hRadio: HANDLE) -> Self {
+        create_struct!(radioInfo, pRadioInfo, BLUETOOTH_RADIO_INFO);
+        BluetoothGetRadioInfo(hRadio, pRadioInfo);
+        let addr = ull_to_addr(radioInfo.address.inner);
+        let name = String::from_utf16_lossy(&radioInfo.szName).trim_end_matches(|c| c=='\0').to_string();
+        let class = radioInfo.ulClassofDevice as u32;
+        let subversion = radioInfo.lmpSubversion as u16;
+        let manufacturer = radioInfo.manufacturer as u16;
+        Self { addr, name, class, subversion, manufacturer }
+    }
+
+    pub fn addr(&self) -> Addr {
+        self.addr
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn class(&self) -> u32 {
+        self.class
+    }
+
+    pub fn subversion(&self) -> u16 {
+        self.subversion
+    }
+
+    pub fn manufacturer(&self) -> u16 {
+        self.manufacturer
+    }
 }
 
 impl Radio {
-    fn new(handle: HANDLE) -> Self {
-        Self { handle }
+    fn new(hRadio: HANDLE) -> Self {
+        Self { hRadio }
+    }
+
+    pub fn info(&self) -> RadioInfo {
+        unsafe { RadioInfo::from_radio_handle(self.hRadio) }
     }
 }
 
 impl Drop for Radio {
     fn drop(&mut self) {
         unsafe {
-            CloseHandle(self.handle);
+            CloseHandle(self.hRadio);
         }
     }
 }
@@ -163,14 +223,6 @@ impl Drop for Radios {
             BluetoothFindRadioClose(hFindRadio);
         });
     }
-}
-
-macro_rules! create_struct {
-    ($struct_name: ident, $ptr_name: ident, $struct_type: ty) => {
-        let mut $struct_name: $struct_type = core::mem::zeroed();
-        $struct_name.dwSize = core::mem::size_of::<$struct_type>() as DWORD;
-        let $ptr_name = &$struct_name as *const _ as *mut $struct_type;
-    };
 }
 
 pub fn radios() -> Radios {
