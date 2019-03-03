@@ -1,6 +1,6 @@
 [package]
 name = "blue"
-version = "0.0.0"
+version = "0.0.1"
 description = "An extensive unified bluetooth library"
 license = "WTFPL"
 authors = ["luojia65 <me@luojia.cc>"]
@@ -10,5 +10,5 @@ build = "build.rs"
 [dependencies]
 
 [dependencies.winapi]
-version = "*"
+version = "0.3.6"
 features = ["winsock2", "errhandlingapi", "handleapi"]
