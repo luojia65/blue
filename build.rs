@@ -1,10 +1,9 @@
-use std::env::var;
-
+#[cfg(windows)]
 fn main() {    
-    let target = var("TARGET").unwrap();
-    let target: Vec<_> = target.split('-').collect();
-    if target.get(2) != Some(&"windows") {
-        panic!("Target not supported")
-    }
     println!("cargo:rustc-link-lib=Bthprops");
+}
+
+#[cfg(not(windows))]
+fn main() {
+    panic!("target not supported. by now blue only support windows")
 }
