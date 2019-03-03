@@ -1,6 +1,8 @@
 mod os;
 mod addr;
+mod class;
 
+pub use class::Class;
 pub use addr::Addr;
 
 #[derive(Clone, Hash, Eq, PartialEq)]
