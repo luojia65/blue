@@ -1,6 +1,7 @@
 mod os;
 mod addr;
 mod class;
+mod manufacturer;
 
 pub use class::Class;
 pub use addr::Addr;
