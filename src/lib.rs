@@ -1,24 +1,25 @@
-#![allow(unused)]
+mod os;
 
-pub mod comm;
-
-pub struct Error {}
-
-pub type Result<T> = core::result::Result<T, Error>;
-
-pub struct Device {
-    mac_addr: Addr
+#[derive(Debug)]
+pub struct Radio {
+    inner: os::Radio,
 }
 
-pub fn scan_devices(buf: &mut [Device]) -> Result<usize> {
-    unimplemented!()
+#[derive(Debug)]
+pub struct Radios {
+    inner: os::Radios
 }
 
-pub struct Addr {
-    inner: [u8; 6]
+impl Iterator for Radios {
+    type Item = Radio;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|inner| Radio { inner })
+    }
 }
 
-pub trait ToBlueAddrs {
-    // todo
+pub fn radios() -> Radios {
+    Radios {
+        inner: os::radios()
+    }
 }
-

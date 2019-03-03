@@ -5,5 +5,10 @@ description = "An extensive unified bluetooth library"
 license = "WTFPL"
 authors = ["luojia65 <me@luojia.cc>"]
 edition = "2018"
+build = "build.rs"
 
 [dependencies]
+
+[dependencies.winapi]
+version = "*"
+features = ["winsock2", "errhandlingapi", "handleapi"]
