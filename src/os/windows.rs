@@ -115,6 +115,9 @@ extern "system" {
     pub fn BluetoothFindRadioClose (
         hFind: HBLUETOOTH_RADIO_FIND
     ) -> BOOL;
+    // pub fn BluetoothIsDiscoverable(
+    //     hRadio: HANDLE,
+    // ) -> BOOL;
 }
 
 macro_rules! create_struct {
@@ -184,6 +187,12 @@ impl Radio {
     pub fn info(&self) -> RadioInfo {
         unsafe { RadioInfo::from_radio_handle(self.hRadio) }
     }
+
+    // pub fn is_discoverable(&self) -> bool {
+    //     unsafe {
+    //         BluetoothIsDiscoverable(self.hRadio) == TRUE
+    //     }
+    // }
 }
 
 impl Drop for Radio {
