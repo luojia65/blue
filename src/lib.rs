@@ -20,7 +20,7 @@ impl RadioInfo {
         self.inner.name()
     }
 
-    pub fn class(&self) -> u32 {
+    pub fn class(&self) -> Class {
         self.inner.class()
     }
 

@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 use core::ptr::NonNull;
+use std::time::Instant;
 use winapi::{
     ctypes::c_void,
     shared::{
@@ -13,7 +14,7 @@ use winapi::{
     },
     STRUCT
 };
-use crate::Addr;
+use crate::{Addr, Class};
 
 pub const BLUETOOTH_MAX_NAME_SIZE: usize = 248;
 pub type PFN_DEVICE_CALLBACK = Option<unsafe extern "system" fn(
@@ -23,7 +24,7 @@ pub type PFN_DEVICE_CALLBACK = Option<unsafe extern "system" fn(
 pub type PBLUETOOTH_DEVICE_INFO = *mut BLUETOOTH_DEVICE_INFO;
 pub type PBLUETOOTH_RADIO_INFO = *mut BLUETOOTH_RADIO_INFO;
 // pub type BTH_ADDR = ULONGLONG;
-// pub type HBLUETOOTH_DEVICE_FIND = LPVOID;
+pub type HBLUETOOTH_DEVICE_FIND = LPVOID;
 pub type HBLUETOOTH_RADIO_FIND = LPVOID;
 STRUCT!{struct BLUETOOTH_ADDRESS{
     inner: ULONGLONG,
@@ -129,6 +130,109 @@ macro_rules! create_struct {
 }
 
 #[derive(Debug)]
+pub struct Device {
+
+}
+
+impl Device {
+    pub fn info() -> DeviceInfo {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug)]
+pub struct DeviceInfo {
+
+}
+
+impl DeviceInfo {
+    pub fn addr(&self) -> Addr {
+        unimplemented!()
+    }
+
+    pub fn class(&self) -> Class {
+        unimplemented!()
+    }
+
+    pub fn connected(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn remembered(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn authenticated(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn last_seen(&self) -> Instant {
+        unimplemented!()
+    }
+
+    pub fn last_used(&self) -> Instant {
+        unimplemented!()
+    }
+
+    pub fn name(&self) -> String {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug)]
+pub struct Devices {
+    hFindDevice: HBLUETOOTH_DEVICE_FIND,
+}
+
+pub struct SearchOptions {
+    btsp: BLUETOOTH_DEVICE_SEARCH_PARAMS,
+    pbtsp: *mut BLUETOOTH_DEVICE_SEARCH_PARAMS,
+}
+
+impl SearchOptions {
+    pub fn new() -> Self {
+        unsafe { 
+            create_struct!(btsp, pbtsp, BLUETOOTH_DEVICE_SEARCH_PARAMS); 
+            Self { btsp, pbtsp }
+        }
+    }
+
+    pub fn return_authenticated(&mut self, authenticated: bool) -> &mut Self {
+        self.btsp.fReturnAuthenticated = authenticated as BOOL;
+        self
+    }
+
+    pub fn return_connected(&mut self, connected: bool) -> &mut Self {
+        self.btsp.fReturnConnected = connected as BOOL;
+        self
+    }
+
+    pub fn return_remembered(&mut self, remembered: bool) -> &mut Self {
+        self.btsp.fReturnRemembered = remembered as BOOL;
+        self
+    }
+
+    pub fn return_unknown(&mut self, unknown: bool) -> &mut Self {
+        self.btsp.fReturnUnknown = unknown as BOOL;
+        self
+    }
+
+    pub fn issue_inquiry(&mut self, issue_inquiry: bool) -> &mut Self {
+        self.btsp.fIssueInquiry = issue_inquiry as BOOL;
+        self
+    }
+
+    pub fn timeout_multiplier(&mut self, timeout_multiplier: u8) -> &mut Self {
+        self.btsp.cTimeoutMultiplier = timeout_multiplier as UCHAR;
+        self
+    }
+
+    pub fn search(&self, radio: &Radio) -> Devices {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug)]
 pub struct Radio {
     hRadio: HANDLE,
 }
@@ -137,7 +241,7 @@ pub struct Radio {
 pub struct RadioInfo {
     addr: Addr,
     name: String,
-    class: u32,
+    class: Class,
     subversion: u16,
     manufacturer: u16,
 }
@@ -152,7 +256,7 @@ impl RadioInfo {
         BluetoothGetRadioInfo(hRadio, pRadioInfo);
         let addr = ull_to_addr(radioInfo.address.inner);
         let name = String::from_utf16_lossy(&radioInfo.szName).trim_end_matches(|c| c=='\0').to_string();
-        let class = radioInfo.ulClassofDevice as u32;
+        let class = Class::from(radioInfo.ulClassofDevice as u32);
         let subversion = radioInfo.lmpSubversion as u16;
         let manufacturer = radioInfo.manufacturer as u16;
         Self { addr, name, class, subversion, manufacturer }
@@ -166,7 +270,7 @@ impl RadioInfo {
         &self.name
     }
 
-    pub fn class(&self) -> u32 {
+    pub fn class(&self) -> Class {
         self.class
     }
 
@@ -187,6 +291,10 @@ impl Radio {
     pub fn info(&self) -> RadioInfo {
         unsafe { RadioInfo::from_radio_handle(self.hRadio) }
     }
+
+    pub fn devices(&self) -> Devices {
+        unimplemented!()
+    } 
 
     // pub fn is_discoverable(&self) -> bool {
     //     unsafe {

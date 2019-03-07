@@ -1,5 +1,8 @@
 // https://www.bluetooth.com/specifications/assigned-numbers/baseband
 #![allow(unused)]
+
+use core::fmt;
+
 const MAJOR_SERVICE_POSITIONING: u32 = 1 << 16;
 const MAJOR_SERVICE_NETWORKING: u32 = 1 << 17;
 const MAJOR_SERVICE_RENDERING: u32 = 1 << 18;
@@ -20,7 +23,7 @@ const MAJOR_DEVICE_TOY: u32 = 0b01000 << 8;
 const MAJOR_DEVICE_HEALTH: u32 = 0b01001 << 8;
 const MAJOR_DEVICE_UNCATEGORIZED: u32 = 0b11111 << 8;
 
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct Class {
     value: u32
 }
@@ -31,3 +34,23 @@ impl From<u32> for Class {
     }
 }
 
+impl From<Class> for u32 {
+    fn from(class: Class) -> u32 {
+        class.value
+    }
+}
+
+macro_rules! impl_fmt {
+    ($($trait_to_impl: ident )+) => {
+        $(
+impl fmt::$trait_to_impl for Class {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use fmt::$trait_to_impl;
+        self.value.fmt(f)
+    }
+} 
+        )+
+    };
+}
+
+impl_fmt!(Binary Debug Display LowerHex Octal UpperHex);

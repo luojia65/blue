@@ -1,5 +1,5 @@
-#[cfg(target_os = "linux")]
-#[link(name="bluetooth")]
+
+#[link(name = "bluetooth")]
 extern "C" {
     fn hci_get_route(addr: *mut BtAddr) -> c_int;
     fn hci_open_dev(device_id: c_int) -> c_int;
