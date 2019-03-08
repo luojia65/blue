@@ -128,6 +128,7 @@ macro_rules! create_struct {
     };
 }
 
+#[derive(Debug)]
 pub struct Device {
     info: crate::DeviceInfo,
 }
@@ -160,16 +161,16 @@ impl Devices {
         unsafe {
             create_struct!(btsp, pbtsp, BLUETOOTH_DEVICE_SEARCH_PARAMS); 
             create_struct!(btdi, pbtdi, BLUETOOTH_DEVICE_INFO);
-            btsp.hRadio = hRadio;
             btsp.fReturnAuthenticated = options.return_authenticated as BOOL;
             btsp.fReturnConnected = options.return_connected as BOOL;
             btsp.fReturnRemembered = options.return_remembered as BOOL;
             btsp.fReturnUnknown = options.return_unknown as BOOL;
             btsp.fIssueInquiry = options.issue_inquiry as BOOL;
             btsp.cTimeoutMultiplier = options.timeout_multiplier as UCHAR;
-            let hFindDevice = BluetoothFindFirstDevice(pbtsp, pbtdi);
-            dbg!(hFindDevice);
-            Self { btdi, pbtdi, hFindDevice }
+            btsp.hRadio = hRadio;
+            let mut ans = Self { btdi, pbtdi, hFindDevice: core::ptr::null_mut() };
+            ans.hFindDevice = BluetoothFindFirstDevice(pbtsp, ans.pbtdi);
+            ans
         }
     }
 }
