@@ -244,15 +244,17 @@ impl Radio {
         Self { hRadio }
     }
 
-    pub fn read_info(&self, buf: &mut crate::RadioInfo) {
+    pub fn info(&self) -> crate::RadioInfo {
         unsafe { 
             create_struct!(radioInfo, pRadioInfo, BLUETOOTH_RADIO_INFO);
             BluetoothGetRadioInfo(self.hRadio, pRadioInfo);
+            let mut buf = core::mem::zeroed::<crate::RadioInfo>();
             buf.addr = ull_to_addr(radioInfo.address.inner);
             buf.name = String::from_utf16_lossy(&radioInfo.szName).trim_end_matches(|c| c=='\0').to_string();
             buf.class = (radioInfo.ulClassofDevice as u32).into();
             buf.subversion = radioInfo.lmpSubversion as u16;
             buf.manufacturer = radioInfo.manufacturer as u16;
+            buf
         }
     }
 

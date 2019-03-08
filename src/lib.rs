@@ -18,15 +18,6 @@ pub struct RadioInfo {
 }
 
 impl RadioInfo {
-    pub fn new() -> RadioInfo {
-        RadioInfo {
-            addr: Addr::from([0, 0, 0, 0, 0, 0]),
-            name: String::from(""),
-            class: Class::from(0),
-            subversion: 0,
-            manufacturer: 0,
-        }
-    }
 
     pub fn addr(&self) -> Addr {
         self.addr
@@ -54,16 +45,14 @@ pub struct Radio {
 }
 
 impl Radio {
-    pub fn read_info(&self, buf: &mut RadioInfo) {
-        self.inner.read_info(buf)
+    pub fn info(&self) -> RadioInfo {
+        self.inner.info()
     }
 }
 
 impl fmt::Debug for Radio {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut buf = RadioInfo::new();
-        self.read_info(&mut buf);
-        write!(f, "{:?}", buf)
+        write!(f, "{:?}", self.info())
     }
 }
 
