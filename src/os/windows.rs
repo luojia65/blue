@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 use core::ptr::NonNull;
+use core::fmt;
 use winapi::{
     ctypes::c_void,
     shared::{
@@ -27,7 +28,7 @@ pub type HBLUETOOTH_RADIO_FIND = LPVOID;
 STRUCT!{struct BLUETOOTH_ADDRESS{
     inner: ULONGLONG,
 }}
-STRUCT!{struct BLUETOOTH_DEVICE_INFO{ 
+STRUCT!{struct BLUETOOTH_DEVICE_INFO { 
     dwSize: DWORD,
     Address: BLUETOOTH_ADDRESS,
     ulClassofDevice: ULONG,
@@ -38,7 +39,7 @@ STRUCT!{struct BLUETOOTH_DEVICE_INFO{
     stLastUsed: SYSTEMTIME,
     szName: [WCHAR; BLUETOOTH_MAX_NAME_SIZE],
 }}
-STRUCT!{struct BLUETOOTH_COD_PAIRS{
+STRUCT!{struct BLUETOOTH_COD_PAIRS {
     ulCODMask: ULONG,
     pcszDescription: LPCWSTR,
 }}
@@ -88,17 +89,17 @@ extern "system" {
     // pub fn BluetoothSelectDevicesFree (
     //     pbtsdp: *mut BLUETOOTH_SELECT_DEVICE_PARAMS
     // ) -> BOOL;
-    // pub fn BluetoothFindFirstDevice (
-    //     pbtsp: *const BLUETOOTH_DEVICE_SEARCH_PARAMS,
-    //     pbtdi: *mut BLUETOOTH_DEVICE_INFO,
-    // ) -> HBLUETOOTH_DEVICE_FIND;
-    // pub fn BluetoothFindNextDevice (
-    //     hFind: HBLUETOOTH_DEVICE_FIND,
-    //     pbtdi: *mut BLUETOOTH_DEVICE_INFO,
-    // ) -> BOOL;
-    // pub fn BluetoothFindDeviceClose (
-    //     hFind: HBLUETOOTH_DEVICE_FIND
-    // ) -> BOOL;
+    pub fn BluetoothFindFirstDevice (
+        pbtsp: *const BLUETOOTH_DEVICE_SEARCH_PARAMS,
+        pbtdi: *mut BLUETOOTH_DEVICE_INFO,
+    ) -> HBLUETOOTH_DEVICE_FIND;
+    pub fn BluetoothFindNextDevice (
+        hFind: HBLUETOOTH_DEVICE_FIND,
+        pbtdi: *mut BLUETOOTH_DEVICE_INFO,
+    ) -> BOOL;
+    pub fn BluetoothFindDeviceClose (
+        hFind: HBLUETOOTH_DEVICE_FIND
+    ) -> BOOL;
     pub fn BluetoothFindFirstRadio (
         pbtfrp: *const BLUETOOTH_FIND_RADIO_PARAMS,
         phRadio: *mut HANDLE,
@@ -127,106 +128,135 @@ macro_rules! create_struct {
     };
 }
 
-#[derive(Debug)]
 pub struct Device {
-
+    info: crate::DeviceInfo,
 }
 
 impl Device {
-    // pub fn info() -> DeviceInfo {
-    //     unimplemented!()
-    // }
+    fn new(btdi: BLUETOOTH_DEVICE_INFO) -> Self {
+        Self { info: crate::DeviceInfo {
+            addr: ull_to_addr(btdi.Address.inner),
+            class: (btdi.ulClassofDevice as u32).into(),
+            connected: btdi.fConnected == TRUE,
+            remembered: btdi.fRemembered == TRUE,
+            authenticated: btdi.fAuthenticated == TRUE,
+            name: String::from_utf16_lossy(&btdi.szName).trim_end_matches(|c| c=='\0').to_string(),
+        } }
+    }
+
+    pub fn info(&self) -> crate::DeviceInfo {
+        self.info.clone()
+    }
 }
 
-// #[derive(Debug)]
-// pub struct DeviceInfo {
-
-// }
-
-// impl DeviceInfo {
-//     pub fn addr(&self) -> Addr {
-//         unimplemented!()
-//     }
-
-//     pub fn class(&self) -> Class {
-//         unimplemented!()
-//     }
-
-//     pub fn connected(&self) -> bool {
-//         unimplemented!()
-//     }
-
-//     pub fn remembered(&self) -> bool {
-//         unimplemented!()
-//     }
-
-//     pub fn authenticated(&self) -> bool {
-//         unimplemented!()
-//     }
-
-//     pub fn last_seen(&self) -> Instant {
-//         unimplemented!()
-//     }
-
-//     pub fn last_used(&self) -> Instant {
-//         unimplemented!()
-//     }
-
-//     pub fn name(&self) -> String {
-//         unimplemented!()
-//     }
-// }
-
-#[derive(Debug)]
 pub struct Devices {
+    btdi: BLUETOOTH_DEVICE_INFO,
+    pbtdi: PBLUETOOTH_DEVICE_INFO,
     hFindDevice: HBLUETOOTH_DEVICE_FIND,
 }
 
+impl Devices {
+    fn new(options: &SearchOptions, hRadio: HANDLE) -> Self {
+        unsafe {
+            create_struct!(btsp, pbtsp, BLUETOOTH_DEVICE_SEARCH_PARAMS); 
+            create_struct!(btdi, pbtdi, BLUETOOTH_DEVICE_INFO);
+            btsp.hRadio = hRadio;
+            btsp.fReturnAuthenticated = options.return_authenticated as BOOL;
+            btsp.fReturnConnected = options.return_connected as BOOL;
+            btsp.fReturnRemembered = options.return_remembered as BOOL;
+            btsp.fReturnUnknown = options.return_unknown as BOOL;
+            btsp.fIssueInquiry = options.issue_inquiry as BOOL;
+            btsp.cTimeoutMultiplier = options.timeout_multiplier as UCHAR;
+            let hFindDevice = BluetoothFindFirstDevice(pbtsp, pbtdi);
+            dbg!(hFindDevice);
+            Self { btdi, pbtdi, hFindDevice }
+        }
+    }
+}
+
+impl fmt::Debug for Devices {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Devices")
+            .field("hFindDevice", &format!("{:?}", self.hFindDevice))
+            .finish()
+    }
+}
+
+impl Iterator for Devices {
+    type Item = Device;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.hFindDevice != core::ptr::null_mut() {
+            let ans = Device::new(self.btdi.clone());
+            if unsafe { BluetoothFindNextDevice(self.hFindDevice, self.pbtdi) } != TRUE {
+                self.hFindDevice = core::ptr::null_mut()
+            }
+            Some(ans)
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for Devices {
+    fn drop(&mut self) {               
+        unsafe { BluetoothFindDeviceClose(self.hFindDevice) };
+    }
+}
+
 pub struct SearchOptions {
-    btsp: BLUETOOTH_DEVICE_SEARCH_PARAMS,
-    pbtsp: *mut BLUETOOTH_DEVICE_SEARCH_PARAMS,
+    return_authenticated: bool,
+    return_connected: bool,
+    return_remembered: bool,
+    return_unknown: bool,
+    issue_inquiry: bool,
+    timeout_multiplier: u8,
 }
 
 impl SearchOptions {
     pub fn new() -> Self {
-        unsafe { 
-            create_struct!(btsp, pbtsp, BLUETOOTH_DEVICE_SEARCH_PARAMS); 
-            Self { btsp, pbtsp }
+        Self {
+            return_authenticated: true,
+            return_connected: true,
+            return_remembered: true,
+            return_unknown: true,
+            issue_inquiry: false,
+            timeout_multiplier: 30,
         }
     }
 
     pub fn return_authenticated(&mut self, authenticated: bool) -> &mut Self {
-        self.btsp.fReturnAuthenticated = authenticated as BOOL;
+        self.return_authenticated = authenticated;
         self
     }
 
     pub fn return_connected(&mut self, connected: bool) -> &mut Self {
-        self.btsp.fReturnConnected = connected as BOOL;
+        self.return_connected = connected;
         self
     }
 
     pub fn return_remembered(&mut self, remembered: bool) -> &mut Self {
-        self.btsp.fReturnRemembered = remembered as BOOL;
+        self.return_remembered = remembered;
         self
     }
 
     pub fn return_unknown(&mut self, unknown: bool) -> &mut Self {
-        self.btsp.fReturnUnknown = unknown as BOOL;
+        self.return_unknown = unknown;
         self
     }
 
     pub fn issue_inquiry(&mut self, issue_inquiry: bool) -> &mut Self {
-        self.btsp.fIssueInquiry = issue_inquiry as BOOL;
+        self.issue_inquiry = issue_inquiry;
         self
     }
 
     pub fn timeout_multiplier(&mut self, timeout_multiplier: u8) -> &mut Self {
-        self.btsp.cTimeoutMultiplier = timeout_multiplier as UCHAR;
+        self.timeout_multiplier = timeout_multiplier;
         self
     }
 
     pub fn search(&self, radio: &Radio) -> Devices {
-        unimplemented!()
+        Devices::new(self, radio.hRadio)
     }
 }
 
@@ -259,7 +289,14 @@ impl Radio {
     }
 
     pub fn devices(&self) -> Devices {
-        unimplemented!()
+        SearchOptions::new()
+            .return_authenticated(true)
+            .return_connected(true)
+            .return_remembered(true)
+            .return_unknown(true)
+            .issue_inquiry(false)
+            .timeout_multiplier(30)
+            .search(&self)
     } 
 
     // pub fn is_discoverable(&self) -> bool {
@@ -314,7 +351,6 @@ pub fn radios() -> Radios {
         let phRadio = &hRadio as *const _ as *mut _;
         create_struct!(btfrp, pbtfrp, BLUETOOTH_FIND_RADIO_PARAMS);
         let hFindRadio = BluetoothFindFirstRadio(pbtfrp, phRadio);
-        // todo: GetLastError
         Radios {
             last_radio: hRadio,
             handle_find_radio: NonNull::new(hFindRadio),
