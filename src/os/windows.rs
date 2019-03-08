@@ -1,6 +1,5 @@
 #![allow(non_camel_case_types, non_snake_case)]
 use core::ptr::NonNull;
-use std::time::Instant;
 use winapi::{
     ctypes::c_void,
     shared::{
@@ -14,7 +13,6 @@ use winapi::{
     },
     STRUCT
 };
-use crate::{Addr, Class};
 
 pub const BLUETOOTH_MAX_NAME_SIZE: usize = 248;
 pub type PFN_DEVICE_CALLBACK = Option<unsafe extern "system" fn(
@@ -135,49 +133,49 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn info() -> DeviceInfo {
-        unimplemented!()
-    }
+    // pub fn info() -> DeviceInfo {
+    //     unimplemented!()
+    // }
 }
 
-#[derive(Debug)]
-pub struct DeviceInfo {
+// #[derive(Debug)]
+// pub struct DeviceInfo {
 
-}
+// }
 
-impl DeviceInfo {
-    pub fn addr(&self) -> Addr {
-        unimplemented!()
-    }
+// impl DeviceInfo {
+//     pub fn addr(&self) -> Addr {
+//         unimplemented!()
+//     }
 
-    pub fn class(&self) -> Class {
-        unimplemented!()
-    }
+//     pub fn class(&self) -> Class {
+//         unimplemented!()
+//     }
 
-    pub fn connected(&self) -> bool {
-        unimplemented!()
-    }
+//     pub fn connected(&self) -> bool {
+//         unimplemented!()
+//     }
 
-    pub fn remembered(&self) -> bool {
-        unimplemented!()
-    }
+//     pub fn remembered(&self) -> bool {
+//         unimplemented!()
+//     }
 
-    pub fn authenticated(&self) -> bool {
-        unimplemented!()
-    }
+//     pub fn authenticated(&self) -> bool {
+//         unimplemented!()
+//     }
 
-    pub fn last_seen(&self) -> Instant {
-        unimplemented!()
-    }
+//     pub fn last_seen(&self) -> Instant {
+//         unimplemented!()
+//     }
 
-    pub fn last_used(&self) -> Instant {
-        unimplemented!()
-    }
+//     pub fn last_used(&self) -> Instant {
+//         unimplemented!()
+//     }
 
-    pub fn name(&self) -> String {
-        unimplemented!()
-    }
-}
+//     pub fn name(&self) -> String {
+//         unimplemented!()
+//     }
+// }
 
 #[derive(Debug)]
 pub struct Devices {
@@ -237,50 +235,8 @@ pub struct Radio {
     hRadio: HANDLE,
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct RadioInfo {
-    addr: Addr,
-    name: String,
-    class: Class,
-    subversion: u16,
-    manufacturer: u16,
-}
-
-fn ull_to_addr(src: ULONGLONG) -> Addr {
-    Addr::from(unsafe { *(&src as *const u64 as *const [u8; 6]) })
-}
-
-impl RadioInfo {
-    unsafe fn from_radio_handle(hRadio: HANDLE) -> Self {
-        create_struct!(radioInfo, pRadioInfo, BLUETOOTH_RADIO_INFO);
-        BluetoothGetRadioInfo(hRadio, pRadioInfo);
-        let addr = ull_to_addr(radioInfo.address.inner);
-        let name = String::from_utf16_lossy(&radioInfo.szName).trim_end_matches(|c| c=='\0').to_string();
-        let class = Class::from(radioInfo.ulClassofDevice as u32);
-        let subversion = radioInfo.lmpSubversion as u16;
-        let manufacturer = radioInfo.manufacturer as u16;
-        Self { addr, name, class, subversion, manufacturer }
-    }
-
-    pub fn addr(&self) -> Addr {
-        self.addr
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn class(&self) -> Class {
-        self.class
-    }
-
-    pub fn subversion(&self) -> u16 {
-        self.subversion
-    }
-
-    pub fn manufacturer(&self) -> u16 {
-        self.manufacturer
-    }
+fn ull_to_addr(src: ULONGLONG) -> crate::Addr {
+    crate::Addr::from(unsafe { *(&src as *const u64 as *const [u8; 6]) })
 }
 
 impl Radio {
@@ -288,8 +244,16 @@ impl Radio {
         Self { hRadio }
     }
 
-    pub fn info(&self) -> RadioInfo {
-        unsafe { RadioInfo::from_radio_handle(self.hRadio) }
+    pub fn read_info(&self, buf: &mut crate::RadioInfo) {
+        unsafe { 
+            create_struct!(radioInfo, pRadioInfo, BLUETOOTH_RADIO_INFO);
+            BluetoothGetRadioInfo(self.hRadio, pRadioInfo);
+            buf.addr = ull_to_addr(radioInfo.address.inner);
+            buf.name = String::from_utf16_lossy(&radioInfo.szName).trim_end_matches(|c| c=='\0').to_string();
+            buf.class = (radioInfo.ulClassofDevice as u32).into();
+            buf.subversion = radioInfo.lmpSubversion as u16;
+            buf.manufacturer = radioInfo.manufacturer as u16;
+        }
     }
 
     pub fn devices(&self) -> Devices {
