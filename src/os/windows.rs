@@ -151,6 +151,7 @@ impl Device {
 }
 
 pub struct Devices {
+    btsp: BLUETOOTH_DEVICE_SEARCH_PARAMS,
     btdi: BLUETOOTH_DEVICE_INFO,
     pbtdi: PBLUETOOTH_DEVICE_INFO,
     hFindDevice: HBLUETOOTH_DEVICE_FIND,
@@ -158,17 +159,19 @@ pub struct Devices {
 
 impl Devices {
     fn new(options: &SearchOptions, hRadio: HANDLE) -> Self {
-        unsafe {
-            create_struct!(btsp, pbtsp, BLUETOOTH_DEVICE_SEARCH_PARAMS); 
-            create_struct!(btdi, pbtdi, BLUETOOTH_DEVICE_INFO);
-            btsp.fReturnAuthenticated = options.return_authenticated as BOOL;
-            btsp.fReturnConnected = options.return_connected as BOOL;
-            btsp.fReturnRemembered = options.return_remembered as BOOL;
-            btsp.fReturnUnknown = options.return_unknown as BOOL;
-            btsp.fIssueInquiry = options.issue_inquiry as BOOL;
-            btsp.cTimeoutMultiplier = options.timeout_multiplier as UCHAR;
-            btsp.hRadio = hRadio;
-            let mut ans = Self { btdi, pbtdi, hFindDevice: core::ptr::null_mut() };
+        unsafe {            
+            let mut ans = core::mem::zeroed::<Self>();
+            ans.btsp.dwSize = core::mem::size_of::<BLUETOOTH_DEVICE_SEARCH_PARAMS>() as DWORD;
+            let pbtsp = &ans.btsp as *const _ as *mut BLUETOOTH_DEVICE_SEARCH_PARAMS;
+            ans.btdi.dwSize = core::mem::size_of::<BLUETOOTH_DEVICE_INFO>() as DWORD;
+            ans.pbtdi = &ans.btdi as *const _ as *mut BLUETOOTH_DEVICE_INFO;
+            ans.btsp.fReturnAuthenticated = options.return_authenticated as BOOL;
+            ans.btsp.fReturnConnected = options.return_connected as BOOL;
+            ans.btsp.fReturnRemembered = options.return_remembered as BOOL;
+            ans.btsp.fReturnUnknown = options.return_unknown as BOOL;
+            ans.btsp.fIssueInquiry = options.issue_inquiry as BOOL;
+            ans.btsp.cTimeoutMultiplier = options.timeout_multiplier as UCHAR;
+            ans.btsp.hRadio = hRadio;
             ans.hFindDevice = BluetoothFindFirstDevice(pbtsp, ans.pbtdi);
             ans
         }
